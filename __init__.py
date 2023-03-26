@@ -128,7 +128,7 @@ def install_addon(src_path, dst_path):
             with open(main_file, 'wb') as ofp:
                 ofp.write(ifp.read())
     
-    
+
     with open(main_file, 'r') as fp:
         text = fp.read()
         bl_info = get_bl_info(text)
@@ -183,9 +183,6 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         src_path = self.zippath.strip('\"').replace("\\", "/").rstrip("/")
         dst_path = self.get_addon_path().replace("\\", "/").rstrip("/")
 
-        if not os.path.exists(src_path):
-            os.makedirs(src_path)
-        
         if not os.path.exists(dst_path):
             os.makedirs(dst_path)
 
