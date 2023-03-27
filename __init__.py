@@ -160,7 +160,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     )
 
     def menu_func(self, context):
-        self.layout.operator(ADI_OT_Addon_Installer.bl_idname)
+        self.layout.operator(ADI_OT_Addon_Installer.bl_idname, icon='IMPORT')
 
     def invoke(self, context, event):
         wm = context.window_manager
