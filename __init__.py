@@ -211,7 +211,7 @@ def register():
     bpy.types.TOPBAR_MT_edit.append(ADI_OT_Addon_Installer.menu_func)
 
     # test call
-    bpy.ops.adi.addon_installer('INVOKE_DEFAULT')
+    # bpy.ops.adi.addon_installer('INVOKE_DEFAULT')
 
 def unregister():
 
