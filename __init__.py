@@ -58,12 +58,11 @@ def extract_zip(file, extract_path):
             main_file = zip_info.filename
         
         else:
-            # find __init__.py
-            for zip_info in scripts:
-                parent, sep, filename = zip_info.filename.rpartition("/")
-                if filename == "__init__.py":
-                    main_file = zip_info.filename
-                    parent_file = parent + sep
+            # find shortest __init__.py
+            main_file = min(zip_info.filename for zip_info in scripts \
+                     if zip_info.filename.rsplit("/", 1)[-1] == "__init__.py")
+            
+            parent_file = main_file.rstrip("__init__.py")
 
             # only extract __init__.py and its sub files
             for zip_info in zip_file.filelist:
