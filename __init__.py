@@ -9,6 +9,8 @@ bl_info = {
     "category": "Development"
 }
 
+MODULE_NAME = "module"
+
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
 }
@@ -48,6 +50,7 @@ def get_bl_info(filepath="", text=None):
 def open_addon(name):
     bpy.ops.screen.userpref_show(section='ADDONS')
     bpy.data.window_managers[0].addon_search = name
+    bpy.ops.preferences.addon_refresh()
 
 
 # EXAMPLE URLS
@@ -137,6 +140,7 @@ def install_py(src_path, dst_path, filename, content=None):
     with open(out_path, 'wb') as fp:
         fp.write(content)
 
+    bl_info[MODULE_NAME] = filename[:-len('.py')]
     return bl_info
 
 
@@ -177,7 +181,8 @@ def extract_zip(src_path, dst_path, filename, content=None):
         if parent_file.strip("/") == "":    # __init__.py is in root
             dst_path += "/" + filename
         else:   # not necessary but incase of /src/...
-            dst_path += "/" + parent_file.strip("/").replace("/", "-")
+            filename = parent_file.strip("/").replace("/", "-")
+            dst_path += "/" + filename
         
         if not os.path.exists(dst_path):
             os.makedirs(dst_path)
@@ -191,6 +196,7 @@ def extract_zip(src_path, dst_path, filename, content=None):
                 zip_file.extract(zip_info, dst_path)
         
         bl_info = get_bl_info(filepath= dst_path + "/" + main_file)
+        bl_info[MODULE_NAME] = filename
         return bl_info
 
 
@@ -246,8 +252,13 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             ('SYSTEM', "System", ""),
         ),
     )
+    enable: bpy.props.BoolProperty(
+        name="Enable Addon",
+    )
+
 
     def menu_func(self, context):
+        self.layout.separator()
         self.layout.operator(ADI_OT_Addon_Installer.bl_idname, icon='IMPORT')
 
     def invoke(self, context, event):
@@ -270,11 +281,31 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         src_path = self.filepath.strip('\"').replace("\\", "/").rstrip("/")
         dst_path = self.get_addon_path().replace("\\", "/").rstrip("/")
 
-        bl_info = install_addon(src_path, dst_path)
-        addon_name = bl_info['name']
-        open_addon(addon_name)
+        try:
+            bl_info = install_addon(src_path, dst_path)
+            addon_name = bl_info['name']
 
-        self.report({"INFO"}, f'"{addon_name}" Installed!')
+            if self.enable:
+                prefs = context.preferences
+                used_ext = {ext.module for ext in prefs.addons}
+                module_name = bl_info[MODULE_NAME]
+                is_enabled = module_name in used_ext
+                if not is_enabled:
+                    bpy.ops.preferences.addon_enable(module=module_name)
+            else:
+                open_addon(addon_name)
+            
+            self.report({"INFO"}, f'"{addon_name}" Installed!')
+            # self.report({"WARNING"},
+            #             f"Name: {bl_info['name']} \n" +
+            #             f"Location: {bl_info['location']} \n" +
+            #             f"Description: {bl_info['description']} \n"
+            # )
+        except Exception as e:
+            self.report({"ERROR"}, str(e))
+            # self.report({"INFO"}, str(e))
+
+
         return {'FINISHED'}
 
 
@@ -299,6 +330,8 @@ def register():
     # bpy.ops.adi.addon_installer('INVOKE_DEFAULT')
 
 def unregister():
+
+    bpy.types.TOPBAR_MT_edit.remove(ADI_OT_Addon_Installer.menu_func)
 
     for cls in reversed(classes):
         bpy.utils.unregister_class(cls)
