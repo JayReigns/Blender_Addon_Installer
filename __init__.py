@@ -9,14 +9,31 @@ bl_info = {
     "category": "Development"
 }
 
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
+}
+
+HEADER_CONTENT_DISPOSITION = "Content-disposition"
+HEADER_CONTENT_TYPE =  "Content-Type"
+
+TEXT_CONTENT_TYPE =  "text/plain"
+ZIP_CONTENT_TYPE =  "application/zip"
+
+UNSUPPORTED_FILE_EXCEPTION_MSG = "Not a .py or .zip file"
+
 import bpy
 import os
 import requests
+from urllib.parse import urlparse
 from io import BytesIO
 from zipfile import ZipFile
 
 
-def get_bl_info(text):
+def get_bl_info(filepath="", text=None):
+
+    if not text:
+        with open(filepath, encoding="utf-8") as f:
+            text = f.read()
 
     bl_idx = text.index("bl_info") # raise ValueError
     s_idx  = text.index("{", bl_idx)
@@ -33,46 +50,10 @@ def open_addon(name):
     bpy.data.window_managers[0].addon_search = name
 
 
-def list_py(zip_info):
-    """lists only .py files"""
-    return  list(info for info in zip_info 
-                    if not info.is_dir() and info.filename.endswith('.py'))
-
-
-def extract_zip(file, extract_path):
-    """extracts zip and returns main .py file containing bl_info"""
-    
-    with ZipFile(file) as zip_file:
-        scripts = list_py(zip_file.filelist)
-
-        if not scripts:
-            raise Exception("No .py files in the Archive")
-        
-        # main file that contains 'bl_info'
-        main_file = ""
-
-        if len(scripts) == 1:
-            zip_info = scripts[0]
-            zip_info.filename = zip_info.filename.rpartition("/")[-1]
-            zip_file.extract(zip_info, extract_path)
-            main_file = zip_info.filename
-        
-        else:
-            # find shortest __init__.py
-            main_file = min(zip_info.filename for zip_info in scripts \
-                     if zip_info.filename.rsplit("/", 1)[-1] == "__init__.py")
-            
-            parent_file = main_file.rstrip("__init__.py")
-
-            # only extract __init__.py and its sub files
-            for zip_info in zip_file.filelist:
-                if zip_info.filename.startswith(parent_file):
-                    zip_file.extract(zip_info, extract_path)
-
-        return extract_path + "/" + main_file
-
-
 # EXAMPLE URLS
+
+# https://github.com/JayReigns/Blender_Addon_Installer/blob/main/__init__.py
+# https://github.com/JayReigns/Blender_Addon_Installer/raw/main/__init__.py
 
 # https://github.com/JayReigns/Blender_Addon_Installer
 # ['https:', '', 'github.com', 'JayReigns', 'Blender_Addon_Installer']
@@ -85,54 +66,161 @@ def extract_zip(file, extract_path):
 
 def resolve_url(url):
 
-    ext = url.rsplit(".", 1)[-1].lower()
-    if ext not in (".py", ".zip"):
-        components = url.split("/")
-
-        if components[2] == 'github.com':
+    p_url = urlparse(url)
+    
+    if p_url.netloc == 'github.com':
         
-            branch = 'master'
-            if "tree" in components:
-                idx = components.index("tree")
-                branch = components[idx+1]
-            url = "/".join(components[:5]) + '/archive/refs/heads/' + branch + '.zip'
+        path = p_url.path.strip("/")
+        comps = path.split("/")
         
-        # add other websites
-        else:
-            raise Exception("Unsupported URL")
+        if path.endswith('.py'):
+            comps[2] = 'raw'
+            return p_url._replace(path="/".join(comps)).geturl()
+    
+        branch = 'master'
+        if "tree" in comps:
+            idx = comps.index("tree")
+            branch = comps[idx+1]
+        
+        path = "/".join(comps[:2]) + '/archive/refs/heads/' + branch + '.zip'
+        return p_url._replace(path=path).geturl()
+        
+    # add other websites
     
     return url
+
+def download(url):
+
+    download_url = ""
+    
+    r = requests.head(url, allow_redirects=True, headers=HEADERS)
+    header = r.headers
+
+    if HEADER_CONTENT_DISPOSITION in header:
+        cdisp = header[HEADER_CONTENT_DISPOSITION]
+        filename = cdisp.rsplit('filename=', 1)[-1].strip().strip('\"')
+        download_url = url
+    
+    else:
+        ctype = header[HEADER_CONTENT_TYPE]
+        if TEXT_CONTENT_TYPE in ctype or ZIP_CONTENT_TYPE in ctype:
+
+            filename = urlparse(url).path.rsplit("/", 1)[-1]
+            ext = filename.rsplit(".", 1)[-1]
+
+            if ext.lower() in ("py", "zip",):
+                download_url = url
+    
+    if download_url:
+        r = requests.get(url, allow_redirects=True, headers=HEADERS)
+        return filename, r.content
+    else:
+        raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+
+def install_py(src_path, dst_path, filename, content=None):
+    # src_path not used if content != None
+
+    if not content:
+        with open(src_path, 'rb') as fp:
+            content = fp.read()
+
+    bl_info = get_bl_info(text=str(content, "utf-8"))
+
+    if filename == "__init__.py":
+        filename = bl_info['name'] + ".py"
+
+    out_path = dst_path + "/" + filename
+
+    if not os.path.exists(dst_path):
+        os.makedirs(dst_path)
+
+    with open(out_path, 'wb') as fp:
+        fp.write(content)
+
+    return bl_info
+
+
+def extract_zip(src_path, dst_path, filename, content=None):
+    """extracts zip and returns main .py file containing bl_info"""
+    
+    file = BytesIO(content) if content else src_path
+    with ZipFile(file) as zip_file:
+
+        # list .py files
+        scripts = list(info
+                       for info in zip_file.filelist 
+                            if not info.is_dir()
+                                and info.filename.lower().endswith('.py')
+        )
+
+        if not scripts:
+            raise ValueError("No .py files in the Archive")
+
+
+        if len(scripts) == 1:
+            zip_info = scripts[0]
+            filename = zip_info.filename.rsplit("/", 1)[-1]
+
+            if not filename.startswith('__'):   # '__init__.py'
+                content = zip_file.read(zip_info)
+                return install_py(src_path, dst_path, filename, content)
+        
+
+        # find shortest __init__.py
+        main_file = min(zip_info.filename
+                        for zip_info in scripts
+                    if zip_info.filename.rsplit("/", 1)[-1] == "__init__.py"
+        )
+        
+        parent_file, main_file, _ = main_file.rpartition("__init__.py")
+
+        if parent_file.strip("/") == "":    # __init__.py is in root
+            dst_path += "/" + filename
+        else:   # not necessary but incase of /src/...
+            dst_path += "/" + parent_file.strip("/").replace("/", "-")
+        
+        if not os.path.exists(dst_path):
+            os.makedirs(dst_path)
+
+        # only extract __init__.py and its sub files
+        for zip_info in zip_file.filelist:  # scripts[] not used
+            if zip_info.is_dir():
+                continue
+            if zip_info.filename.startswith(parent_file):
+                zip_info.filename = zip_info.filename[len(parent_file):]
+                zip_file.extract(zip_info, dst_path)
+        
+        bl_info = get_bl_info(filepath= dst_path + "/" + main_file)
+        return bl_info
 
 
 def install_addon(src_path, dst_path):
 
     if src_path.startswith("http"): # URL
+        try:
+            error = None
+            filename, content = download(src_path)
+        except ValueError as e:
+            error = e
 
-        src_path = resolve_url(src_path)
-
-        r = requests.get(src_path)
-        file = BytesIO(r.content)
-        main_file = extract_zip(file, dst_path)
-    
+        if error:
+            url = resolve_url(src_path)
+            filename, content = download(url)
+        
     else:   # file path
-
-        ext = src_path.rsplit(".", 1)[-1].lower()
-        if ext not in (".py", ".zip"):
-            raise Exception("Unsupported File type")
-
-        fname = src_path.rsplit("/", 1)[-1]
-        main_file = dst_path + "/" + fname
-
-        with open(src_path, 'rb') as ifp:
-            with open(main_file, 'wb') as ofp:
-                ofp.write(ifp.read())
+        filename = src_path.rsplit("/", 1)[-1]
+        content = None
     
+    ext = filename.rsplit(".", 1)[-1].lower()
 
-    with open(main_file, 'r') as fp:
-        text = fp.read()
-        bl_info = get_bl_info(text)
-    
-    return bl_info
+    if ext == "py":
+        return install_py(src_path, dst_path, filename, content)
+
+    if ext == "zip":
+        return extract_zip(src_path, dst_path, filename, content)
+
+    raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+    return
 
 
 ##############################################################################
@@ -145,7 +233,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     bl_idname = "adi.addon_installer"
     bl_label = "Install Addon"
 
-    zippath: bpy.props.StringProperty(
+    filepath: bpy.props.StringProperty(
         name="URL/FIlepath",
         # subtype="FILE_PATH",
     )
@@ -164,7 +252,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
 
     def invoke(self, context, event):
         wm = context.window_manager
-        self.zippath = wm.clipboard # copy link/path from clipboard
+        self.filepath = wm.clipboard # copy link/path from clipboard
         return wm.invoke_props_dialog(self)
 
     def get_addon_path(self):
@@ -179,11 +267,8 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
 
     def execute(self, context):
 
-        src_path = self.zippath.strip('\"').replace("\\", "/").rstrip("/")
+        src_path = self.filepath.strip('\"').replace("\\", "/").rstrip("/")
         dst_path = self.get_addon_path().replace("\\", "/").rstrip("/")
-
-        if not os.path.exists(dst_path):
-            os.makedirs(dst_path)
 
         bl_info = install_addon(src_path, dst_path)
         addon_name = bl_info['name']
@@ -211,7 +296,7 @@ def register():
     bpy.types.TOPBAR_MT_edit.append(ADI_OT_Addon_Installer.menu_func)
 
     # test call
-    # bpy.ops.adi.addon_installer('INVOKE_DEFAULT')
+    bpy.ops.adi.addon_installer('INVOKE_DEFAULT')
 
 def unregister():
 
