@@ -13,4 +13,4 @@ Quickly install Blender addons from Github link or other links and offline files
 - Auto detect single `.py` file from Github (No need to click `raw` button)
 
 ## Other Addons
-- [API Browser : Browse through the python api via Blender user interface](https://github.com/JayReigns/API_Browser)
+- [API Browser](https://github.com/JayReigns/API_Browser) : Browse through the python api via Blender user interface
