@@ -30,6 +30,8 @@ from urllib.parse import urlparse
 from io import BytesIO
 from zipfile import ZipFile
 
+from bpy.app.translations import pgettext_tip as tip_
+
 
 def get_bl_info(filepath="", text=None):
 
@@ -297,35 +299,50 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         return wm.invoke_props_dialog(self)
 
     def execute(self, context):
+        import addon_utils
 
         src_path = self.filepath.strip('\"').replace("\\", "/").rstrip("/")
         dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
         try:
-            bl_info = install_addon(src_path, dst_path)
-            addon_name = bl_info['name']
+            addons_old = {mod.__name__ for mod in addon_utils.modules()}
 
-            if self.enable:
-                prefs = context.preferences
-                used_ext = {ext.module for ext in prefs.addons}
-                module_name = bl_info[MODULE_NAME]
-                is_enabled = module_name in used_ext
-                if not is_enabled:
-                    bpy.ops.preferences.addon_enable(module=module_name)
-            else:
-                open_addon_window(addon_name)
+            bl_info = install_addon(src_path, dst_path)
+            # addon_name = bl_info['name']
+
+            addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
+            addons_new.discard("modules")
+
+            # disable any addons we may have enabled previously and removed.
+            # this is unlikely but do just in case. bug [#23978]
+            for new_addon in addons_new:
+                addon_utils.disable(new_addon, default_set=True)
+
+            # possible the zip contains multiple addons, we could disallow this
+            # but for now just use the first
+            for mod in addon_utils.modules(refresh=False):
+                if mod.__name__ in addons_new:
+                    info = addon_utils.module_bl_info(mod)
+
+                    if self.enable:
+                        bpy.ops.preferences.addon_enable(module=mod.__name__)
+                    else:
+                        open_addon_window(info["name"])
+                    
+                    break
             
             # in case a new module path was created to install this addon.
             bpy.utils.refresh_script_paths()
 
             bpy.ops.preferences.addon_refresh()
 
-            self.report({"INFO"}, f'"{addon_name}" Installed!')
-            # self.report({"WARNING"},
-            #             f"Name: {bl_info['name']} \n" +
-            #             f"Location: {bl_info['location']} \n" +
-            #             f"Description: {bl_info['description']} \n"
-            # )
+            # print message
+            msg = (
+                tip_("Modules Installed (%s) from %r into %r") %
+                (", ".join(sorted(addons_new)), src_path, dst_path)
+            )
+            # print(msg)
+            self.report({'INFO'}, msg)
         except Exception as e:
             self.report({"ERROR"}, str(e))
             # self.report({"INFO"}, str(e))
