@@ -310,6 +310,9 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             else:
                 open_addon_window(addon_name)
             
+            # in case a new module path was created to install this addon.
+            bpy.utils.refresh_script_paths()
+            
             self.report({"INFO"}, f'"{addon_name}" Installed!')
             # self.report({"WARNING"},
             #             f"Name: {bl_info['name']} \n" +
