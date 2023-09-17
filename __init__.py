@@ -9,17 +9,9 @@ bl_info = {
     "category": "Development"
 }
 
-MODULE_NAME = "module"
-
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/111.0.0.0 Safari/537.36",
 }
-
-HEADER_CONTENT_DISPOSITION = "Content-disposition"
-HEADER_CONTENT_TYPE =  "Content-Type"
-
-TEXT_CONTENT_TYPE =  "text/plain"
-ZIP_CONTENT_TYPE =  "application/zip"
 
 UNSUPPORTED_FILE_EXCEPTION_MSG = "Not a .py or .zip file"
 
