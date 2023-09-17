@@ -90,35 +90,6 @@ def resolve_url(url):
     return url
 
 
-def download(url):
-
-    download_url = ""
-    
-    r = requests.head(url, allow_redirects=True, headers=HEADERS)
-    header = r.headers
-
-    if HEADER_CONTENT_DISPOSITION in header:
-        cdisp = header[HEADER_CONTENT_DISPOSITION]
-        filename = cdisp.rsplit('filename=', 1)[-1].strip().strip('\"')
-        download_url = url
-    
-    else:
-        ctype = header[HEADER_CONTENT_TYPE]
-        if TEXT_CONTENT_TYPE in ctype or ZIP_CONTENT_TYPE in ctype:
-
-            filename = urlparse(url).path.rsplit("/", 1)[-1]
-            ext = filename.rsplit(".", 1)[-1]
-
-            if ext.lower() in ("py", "zip",):
-                download_url = url
-    
-    if download_url:
-        r = requests.get(url, allow_redirects=True, headers=HEADERS)
-        return filename, r.content
-    else:
-        raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
-
-
 def install_py(src_path, dst_path, filename, content=None):
     # src_path not used if content != None
 
