@@ -42,21 +42,6 @@ def get_bl_info(filepath="", text=None):
     return bl_info
 
 
-
-# EXAMPLE URLS
-
-# https://github.com/JayReigns/Blender_Addon_Installer/blob/main/__init__.py
-# https://github.com/JayReigns/Blender_Addon_Installer/raw/main/__init__.py
-
-# https://github.com/JayReigns/Blender_Addon_Installer
-# ['https:', '', 'github.com', 'JayReigns', 'Blender_Addon_Installer']
-
-# https://github.com/JayReigns/Blender_Addon_Installer/tree/main
-# https://github.com/JayReigns/Blender_Addon_Installer/archive/refs/heads/main.zip
-# 'main' is branch name
-# 'master' refers to default even if named 'main'
-# ['https:', '', 'github.com', 'JayReigns', 'Blender_Addon_Installer', 'tree', 'main']
-
 def resolve_url(url):
 
     p_url = urlparse(url)
