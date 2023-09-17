@@ -319,12 +319,11 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         return wm.invoke_props_dialog(self)
 
     def execute(self, context):
-        import addon_utils
-
-        src_path = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
-        dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
         try:
+            src_path = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
+            dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
+
             addons_old = {mod.__name__ for mod in addon_utils.modules()}
 
             install_addon(src_path, dst_path)
