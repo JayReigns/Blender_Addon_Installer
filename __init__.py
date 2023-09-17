@@ -301,7 +301,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     def execute(self, context):
         import addon_utils
 
-        src_path = self.filepath.strip('\"').replace("\\", "/").rstrip("/")
+        src_path = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
         dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
         try:
