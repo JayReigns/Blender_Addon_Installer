@@ -194,17 +194,17 @@ def extract_zip(src_path, dst_path, filename, content=None):
 
 def install_addon(src_path, dst_path):
 
-    if src_path.startswith("http://") \
-        or src_path.startswith("https://"): # URL
-        try:
-            error = None
-            filename, content = download(src_path)
-        except ValueError as e:
-            error = e
+    if src_path.startswith("http://") or src_path.startswith("https://"): # URL
 
-        if error:
-            url = resolve_url(src_path)
-            filename, content = download(url)
+        url = resolve_url(src_path)
+        # also filters non .py or .zip files
+        filename = get_filename_from_url(url, req_headers=HEADERS)
+
+        if not filename:
+            raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+
+        r = requests.get(url, allow_redirects=True, headers=HEADERS, stream=True)
+        content = r.content
         
     else:   # file path
         filename = src_path.rsplit("/", 1)[-1]
