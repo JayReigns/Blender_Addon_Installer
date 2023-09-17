@@ -89,6 +89,7 @@ def resolve_url(url):
     
     return url
 
+
 def download(url):
 
     download_url = ""
@@ -117,6 +118,7 @@ def download(url):
     else:
         raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
 
+
 def install_py(src_path, dst_path, filename, content=None):
     # src_path not used if content != None
 
@@ -136,9 +138,6 @@ def install_py(src_path, dst_path, filename, content=None):
 
     with open(out_path, 'wb') as fp:
         fp.write(content)
-
-    bl_info[MODULE_NAME] = filename[:-len('.py')]
-    return bl_info
 
 
 def extract_zip(src_path, dst_path, filename, content=None):
@@ -191,10 +190,6 @@ def extract_zip(src_path, dst_path, filename, content=None):
             if zip_info.filename.startswith(parent_file):
                 zip_info.filename = zip_info.filename[len(parent_file):]
                 zip_file.extract(zip_info, dst_path)
-        
-        bl_info = get_bl_info(filepath= dst_path + "/" + main_file)
-        bl_info[MODULE_NAME] = filename
-        return bl_info
 
 
 def install_addon(src_path, dst_path):
@@ -218,12 +213,14 @@ def install_addon(src_path, dst_path):
     ext = filename.rsplit(".", 1)[-1].lower()
 
     if ext == "py":
-        return install_py(src_path, dst_path, filename, content)
+        install_py(src_path, dst_path, filename, content)
 
-    if ext == "zip":
-        return extract_zip(src_path, dst_path, filename, content)
+    elif ext == "zip":
+        extract_zip(src_path, dst_path, filename, content)
 
-    raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+    else:
+        raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+    
     return
 
 
@@ -307,8 +304,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         try:
             addons_old = {mod.__name__ for mod in addon_utils.modules()}
 
-            bl_info = install_addon(src_path, dst_path)
-            # addon_name = bl_info['name']
+            install_addon(src_path, dst_path)
 
             addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
             addons_new.discard("modules")
