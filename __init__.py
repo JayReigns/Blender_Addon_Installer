@@ -328,6 +328,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         except Exception as e:
             self.report({"ERROR"}, str(e))
             # self.report({"INFO"}, str(e))
+            return {'CANCELLED'}
 
 
         return {'FINISHED'}
