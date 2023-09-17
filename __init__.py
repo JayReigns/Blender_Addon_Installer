@@ -48,9 +48,14 @@ def get_bl_info(filepath="", text=None):
 
 
 def open_addon(name):
-    bpy.ops.screen.userpref_show(section='ADDONS')
-    bpy.data.window_managers[0].addon_search = name
-    bpy.ops.preferences.addon_refresh()
+    bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
+    bpy.context.preferences.active_section = 'ADDONS'
+    bpy.context.window_manager.addon_filter = 'All'
+    bpy.context.window_manager.addon_search = name
+    try: # for newer Blender versions
+        bpy.context.preferences.view.show_addons_enabled_only = False
+    except:
+        pass
 
 
 # EXAMPLE URLS
