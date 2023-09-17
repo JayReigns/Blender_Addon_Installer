@@ -16,6 +16,7 @@ HEADERS = {
 UNSUPPORTED_FILE_EXCEPTION_MSG = "Not a .py or .zip file"
 
 import bpy
+import addon_utils
 import os
 import requests
 from urllib.parse import urlparse
@@ -172,6 +173,18 @@ def install_addon(src_path, dst_path):
     else:   # file path
         src_path = src_path.replace("\\", os.path.sep).replace("/", os.path.sep)
         src_path = os.path.abspath(os.path.expanduser(os.path.expandvars(src_path)))
+
+        # Check if we are installing from a target path,
+        # doing so causes 2+ addons of same name or when the same from/to
+        # location is used, removal of the file!
+        addon_path = ""
+        pyfile_dir = os.path.dirname(src_path)
+        for addon_path in addon_utils.paths():
+            if os.path.samefile(pyfile_dir, addon_path):
+                raise ValueError(("Source file is in the add-on search path: %r") % addon_path)
+        del addon_path
+        del pyfile_dir
+        # done checking for exceptional case
 
         filename = os.path.basename(src_path)
         content = None
