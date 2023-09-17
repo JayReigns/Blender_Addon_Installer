@@ -170,7 +170,10 @@ def install_addon(src_path, dst_path):
         content = r.content
         
     else:   # file path
-        filename = src_path.rsplit("/", 1)[-1]
+        src_path = src_path.replace("\\", os.path.sep).replace("/", os.path.sep)
+        src_path = os.path.abspath(os.path.expanduser(os.path.expandvars(src_path)))
+
+        filename = os.path.basename(src_path)
         content = None
     
     ext = filename.rsplit(".", 1)[-1].lower()
