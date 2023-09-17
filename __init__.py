@@ -47,7 +47,7 @@ def get_bl_info(filepath="", text=None):
     return bl_info
 
 
-def open_addon(name):
+def open_addon_window(name):
     bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
     bpy.context.preferences.active_section = 'ADDONS'
     bpy.context.window_manager.addon_filter = 'All'
@@ -298,7 +298,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
                 if not is_enabled:
                     bpy.ops.preferences.addon_enable(module=module_name)
             else:
-                open_addon(addon_name)
+                open_addon_window(addon_name)
             
             self.report({"INFO"}, f'"{addon_name}" Installed!')
             # self.report({"WARNING"},
