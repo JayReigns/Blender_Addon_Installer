@@ -208,7 +208,8 @@ def extract_zip(src_path, dst_path, filename, content=None):
 
 def install_addon(src_path, dst_path):
 
-    if src_path.startswith("http"): # URL
+    if src_path.startswith("http://") \
+        or src_path.startswith("https://"): # URL
         try:
             error = None
             filename, content = download(src_path)
