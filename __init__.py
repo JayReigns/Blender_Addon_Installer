@@ -276,7 +276,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
 
         if target == 'DEFAULT':
             # don't use bpy.utils.script_paths("addons") because we may not be able to write to it.
-            path_addons = bpy.utils.user_resource('SCRIPTS', "addons", create=True)
+            path_addons = bpy.utils.user_resource('SCRIPTS', path="addons", create=True)
         else:
             path_addons = bpy.context.preferences.filepaths.script_directory
             if path_addons:
