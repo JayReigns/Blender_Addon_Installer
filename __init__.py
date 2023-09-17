@@ -340,8 +340,9 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             # print(msg)
             self.report({'INFO'}, msg)
         except Exception as e:
+            import traceback
+            traceback.print_exc()
             self.report({"ERROR"}, str(e))
-            # self.report({"INFO"}, str(e))
             return {'CANCELLED'}
 
 
