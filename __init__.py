@@ -90,9 +90,8 @@ def install_py(src_path, dst_path, filename, content=None):
         with open(src_path, 'rb') as fp:
             content = fp.read()
 
-    bl_info = get_bl_info(text=str(content, "utf-8"))
-
-    if filename == "__init__.py":
+    if filename.startswith('__'):   # '__init__.py'
+        bl_info = get_bl_info(text=str(content, "utf-8"))
         filename = bl_info['name'] + ".py"
 
     out_path = dst_path + "/" + filename
