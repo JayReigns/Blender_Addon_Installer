@@ -52,6 +52,7 @@ def open_addon_window(name):
     bpy.context.preferences.active_section = 'ADDONS'
     bpy.context.window_manager.addon_filter = 'All'
     bpy.context.window_manager.addon_search = name
+    bpy.ops.preferences.addon_refresh()
     try: # for newer Blender versions
         bpy.context.preferences.view.show_addons_enabled_only = False
     except:
