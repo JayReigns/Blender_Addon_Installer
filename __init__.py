@@ -47,17 +47,6 @@ def get_bl_info(filepath="", text=None):
     return bl_info
 
 
-def open_addon_window(name):
-    bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
-    bpy.context.preferences.active_section = 'ADDONS'
-    bpy.context.window_manager.addon_filter = 'All'
-    bpy.context.window_manager.addon_search = name
-    bpy.ops.preferences.addon_refresh()
-    try: # for newer Blender versions
-        bpy.context.preferences.view.show_addons_enabled_only = False
-    except:
-        pass
-
 
 # EXAMPLE URLS
 
@@ -236,6 +225,43 @@ def install_addon(src_path, dst_path):
     return
 
 
+#########################################################################################
+# BLENDER UTILITY FUNCTIONS
+#########################################################################################
+
+
+def open_addon_window(name):
+    bpy.ops.screen.userpref_show('INVOKE_DEFAULT')
+    bpy.context.preferences.active_section = 'ADDONS'
+    bpy.context.window_manager.addon_filter = 'All'
+    bpy.context.window_manager.addon_search = name
+    bpy.ops.preferences.addon_refresh()
+    try: # for newer Blender versions
+        bpy.context.preferences.view.show_addons_enabled_only = False
+    except:
+        pass
+
+
+def get_addon_path(target):
+
+    if target == 'DEFAULT':
+        # don't use bpy.utils.script_paths("addons") because we may not be able to write to it.
+        path_addons = bpy.utils.user_resource('SCRIPTS', path="addons", create=True)
+    else:
+        path_addons = bpy.context.preferences.filepaths.script_directory
+        if path_addons:
+            path_addons = os.path.join(path_addons, "addons")
+
+    if not path_addons:
+        if not path_addons:
+            raise ValueError("Failed to get add-ons path")
+
+    if not os.path.isdir(path_addons):
+        os.makedirs(path_addons, exist_ok=True)
+    
+    return path_addons
+
+
 ##############################################################################
 # OPERATORS
 ##############################################################################
@@ -271,30 +297,10 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         self.filepath = wm.clipboard # copy link/path from clipboard
         return wm.invoke_props_dialog(self)
 
-    def get_addon_path(self):
-        target = self.target
-
-        if target == 'DEFAULT':
-            # don't use bpy.utils.script_paths("addons") because we may not be able to write to it.
-            path_addons = bpy.utils.user_resource('SCRIPTS', path="addons", create=True)
-        else:
-            path_addons = bpy.context.preferences.filepaths.script_directory
-            if path_addons:
-                path_addons = os.path.join(path_addons, "addons")
-
-        if not path_addons:
-            if not path_addons:
-                raise ValueError("Failed to get add-ons path")
-
-        if not os.path.isdir(path_addons):
-            os.makedirs(path_addons, exist_ok=True)
-        
-        return path_addons
-
     def execute(self, context):
 
         src_path = self.filepath.strip('\"').replace("\\", "/").rstrip("/")
-        dst_path = self.get_addon_path().replace("\\", "/").rstrip("/")
+        dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
         try:
             bl_info = install_addon(src_path, dst_path)
