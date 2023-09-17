@@ -208,7 +208,6 @@ def get_filename_from_url(url, req_headers=None):
             filename = disp.rsplit('filename=', 1)[-1].strip().strip('\"')
         
         else:
-            from urllib.parse import urlparse
             filename = os.path.basename(urlparse(url).path)
 
         # check extension
