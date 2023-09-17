@@ -225,6 +225,51 @@ def install_addon(src_path, dst_path):
 
 
 #########################################################################################
+# NETWORK UTILITY FUNCTIONS
+#########################################################################################
+
+
+def get_filename_from_url(url, req_headers=None):
+
+    r = requests.head(url, allow_redirects=True, headers=req_headers)
+    r.raise_for_status()
+
+    headers = r.headers
+
+    content_type = headers["content-type"]
+    if "text/plain" in content_type or \
+        "application/zip" in content_type:
+
+        if "content-disposition" in headers:
+            disp = headers["content-disposition"]
+            filename = disp.rsplit('filename=', 1)[-1].strip().strip('\"')
+        
+        else:
+            from urllib.parse import urlparse
+            filename = os.path.basename(urlparse(url).path)
+
+        # check extension
+        ext = os.path.splitext(filename)[1]
+        if ext.lower() in (".py", ".zip",):
+            return filename
+
+
+def download_temp(url, chunk_size=8192):
+    import tempfile
+
+    temp = tempfile.SpooledTemporaryFile(max_size=chunk_size, mode="w+b")
+
+    with requests.get(url, stream=True) as r:
+        r.raise_for_status()
+        for chunk in r.iter_content(chunk_size=chunk_size): 
+            temp.write(chunk)
+    
+    temp.seek(0)
+
+    return temp
+
+
+#########################################################################################
 # BLENDER UTILITY FUNCTIONS
 #########################################################################################
 
