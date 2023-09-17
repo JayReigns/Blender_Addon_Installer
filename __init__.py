@@ -249,13 +249,11 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         name="URL/FIlepath",
         # subtype="FILE_PATH",
     )
-    dir_type: bpy.props.EnumProperty(
-        name="Install Directory",
+    target: bpy.props.EnumProperty(
+        name="Target Path",
         items=(
-            ('USER', "User", ""),
-            ('PREFERENCE', "Preference", ""),
-            ('LOCAL', "Local", ""),
-            ('SYSTEM', "System", ""),
+            ('DEFAULT', "Default", ""),
+            ('PREFS', "User Prefs", ""),
         ),
     )
     enable: bpy.props.BoolProperty(
@@ -273,14 +271,24 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
         return wm.invoke_props_dialog(self)
 
     def get_addon_path(self):
-        dtype = self.dir_type
+        target = self.target
 
-        if self.dir_type == 'PREFERENCE':
-            pref_dir = bpy.context.preferences.filepaths.script_directory
-            if pref_dir:
-                return pref_dir + "/addons"
+        if target == 'DEFAULT':
+            # don't use bpy.utils.script_paths("addons") because we may not be able to write to it.
+            path_addons = bpy.utils.user_resource('SCRIPTS', "addons", create=True)
+        else:
+            path_addons = bpy.context.preferences.filepaths.script_directory
+            if path_addons:
+                path_addons = os.path.join(path_addons, "addons")
+
+        if not path_addons:
+            if not path_addons:
+                raise ValueError("Failed to get add-ons path")
+
+        if not os.path.isdir(path_addons):
+            os.makedirs(path_addons, exist_ok=True)
         
-        return bpy.utils.resource_path(dtype) + "/scripts/addons"
+        return path_addons
 
     def execute(self, context):
 
