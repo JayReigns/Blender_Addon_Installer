@@ -235,7 +235,6 @@ def open_addon_window(name):
     bpy.context.preferences.active_section = 'ADDONS'
     bpy.context.window_manager.addon_filter = 'All'
     bpy.context.window_manager.addon_search = name
-    bpy.ops.preferences.addon_refresh()
     try: # for newer Blender versions
         bpy.context.preferences.view.show_addons_enabled_only = False
     except:
@@ -318,7 +317,9 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             
             # in case a new module path was created to install this addon.
             bpy.utils.refresh_script_paths()
-            
+
+            bpy.ops.preferences.addon_refresh()
+
             self.report({"INFO"}, f'"{addon_name}" Installed!')
             # self.report({"WARNING"},
             #             f"Name: {bl_info['name']} \n" +
