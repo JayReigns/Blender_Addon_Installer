@@ -26,11 +26,7 @@ from zipfile import ZipFile
 from bpy.app.translations import pgettext_tip as tip_
 
 
-def get_bl_info(filepath="", text=None):
-
-    if not text:
-        with open(filepath, encoding="utf-8") as f:
-            text = f.read()
+def get_bl_info(text):
 
     bl_idx = text.index("bl_info") # raise ValueError
     s_idx  = text.index("{", bl_idx)
@@ -71,7 +67,7 @@ def resolve_url(url):
 def install_py(filename, dst_path, content):
 
     if filename.startswith('__'):   # '__init__.py'
-        bl_info = get_bl_info(text=str(content, "utf-8"))
+        bl_info = get_bl_info(str(content, "utf-8"))
         filename = bl_info['name'] + ".py"
 
     out_path = os.path.join(dst_path, filename)
