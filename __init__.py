@@ -17,7 +17,7 @@ UNSUPPORTED_FILE_EXCEPTION_MSG = "Not a .py or .zip file"
 
 import bpy
 import addon_utils
-import os
+import os, shutil
 import requests
 from urllib.parse import urlparse
 from io import BytesIO
@@ -64,17 +64,13 @@ def resolve_url(url):
     return url
 
 
-def module_filesystem_remove(path_base, module_name):
-    module_name = os.path.splitext(module_name)[0]
-    for f in os.listdir(path_base):
-        f_base = os.path.splitext(f)[0]
-        if f_base == module_name:
-            f_full = os.path.join(path_base, f)
-
-            if os.path.isdir(f_full):
-                os.rmdir(f_full)
-            else:
-                os.remove(f_full)
+def remove_file(path_base, fname):
+    f_full = os.path.join(path_base, fname)
+    if os.path.exists(f_full):
+        if os.path.isdir(f_full):
+            shutil.rmtree(f_full)
+        else:
+            os.remove(f_full)
 
 
 def filter_zipfile(zfile, zipname):
@@ -119,14 +115,17 @@ def filter_zipfile(zfile, zipname):
     # blender doesn't allow . in module name
     base_dir = base_dir.replace(".", "_")
 
+    file_to_extract = []
     # only extract the parent directory of main __init__.py
     for zinfo in zfile.filelist:
         if zinfo.is_dir():
             continue
         if zinfo.filename.startswith(parent_dir):
             # weird bug using 'os.path.join' in windows if filename is '/__init__.py'
-            zinfo.filename = os.path.join(base_dir, zinfo.filename[len(parent_dir):].strip("/"))
-            yield zinfo
+            zinfo.filename = os.path.join(base_dir, zinfo.filename[len(parent_dir):].strip("/")).replace("\\", "/")
+            file_to_extract.append(zinfo)
+    
+    return file_to_extract
 
 
 def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
@@ -164,6 +163,7 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
             content = fp.read()
     
     ext = os.path.splitext(filename)[1]
+    addons_new = {}
 
     if ext == ".py":
         if smart_extract:
@@ -174,36 +174,42 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
         path_dest = os.path.join(path_addons, filename)
 
         if overwrite:
-            module_filesystem_remove(path_addons, filename)
+            remove_file(path_addons, filename)
         elif os.path.exists(path_dest):
             raise ValueError(("File already installed to %r\n") % path_dest)
+
+        addons_old = {mod.__name__ for mod in addon_utils.modules()}
         
         with open(path_dest, 'wb') as fp:
             fp.write(content)
 
+        addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
+
     elif ext == ".zip":
         with ZipFile(BytesIO(content)) as zfile:
             if smart_extract:
-                file_to_extract = list(filter_zipfile(zfile, filename))
+                file_to_extract = filter_zipfile(zfile, filename)
             else:
                 file_to_extract = zfile.filelist
 
             if overwrite:
                 for zinfo in file_to_extract:
-                    module_filesystem_remove(path_addons, zinfo.filename)
+                    remove_file(path_addons, zinfo.filename)
             else:
                 for zinfo in file_to_extract:
                     path_dest = os.path.join(path_addons, zinfo.filename)
                     if os.path.exists(path_dest):
                         raise ValueError(("File already installed to %r\n") % path_dest)
             
+            addons_old = {mod.__name__ for mod in addon_utils.modules()}
+
             for zinfo in file_to_extract:
                 zfile.extract(zinfo, path_addons)
+            
+            addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
 
-    else:
-        raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
-    
-    return
+    addons_new.discard("modules")
+    return addons_new
 
 
 #########################################################################################
@@ -340,12 +346,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             pyfile = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
             path_addons = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
-            addons_old = {mod.__name__ for mod in addon_utils.modules()}
-
-            install_addon(pyfile, path_addons, self.overwrite, self.smart_extract)
-
-            addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
-            addons_new.discard("modules")
+            addons_new = install_addon(pyfile, path_addons, self.overwrite, self.smart_extract)
 
             # disable any addons we may have enabled previously and removed.
             # this is unlikely but do just in case. bug [#23978]
@@ -359,12 +360,9 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
                     info = addon_utils.module_bl_info(mod)
 
                     if self.enable:
-                        # BUG: If module is previously installed and overwrites it again
-                        # we can't enable it, as it is already in 'addons_old'
                         bpy.ops.preferences.addon_enable(module=mod.__name__)
                     else:
                         open_addon_window(info["name"])
-                    
                     break
             
             # in case a new module path was created to install this addon.
