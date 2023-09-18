@@ -129,7 +129,7 @@ def filter_zipfile(zfile, zipname):
             yield zinfo
 
 
-def install_addon(pyfile, path_addons, overwrite=False):
+def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
 
     if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
 
@@ -166,9 +166,10 @@ def install_addon(pyfile, path_addons, overwrite=False):
     ext = os.path.splitext(filename)[1]
 
     if ext == ".py":
-        if filename.startswith('__'):   # '__init__.py'
-            bl_info = get_bl_info(str(content, "utf-8"))
-            filename = bl_info['name'] + ".py"
+        if smart_extract:
+            if filename.startswith('__'):   # '__init__.py'
+                bl_info = get_bl_info(str(content, "utf-8"))
+                filename = bl_info['name'] + ".py"
 
         path_dest = os.path.join(path_addons, filename)
 
@@ -182,7 +183,10 @@ def install_addon(pyfile, path_addons, overwrite=False):
 
     elif ext == ".zip":
         with ZipFile(BytesIO(content)) as zfile:
-            file_to_extract = list(filter_zipfile(zfile, filename))
+            if smart_extract:
+                file_to_extract = list(filter_zipfile(zfile, filename))
+            else:
+                file_to_extract = zfile.filelist
 
             if overwrite:
                 for zinfo in file_to_extract:
@@ -304,6 +308,11 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             ('PREFS', "User Prefs", ""),
         ),
     )
+    smart_extract: bpy.props.BoolProperty(
+        name="Smart Extract",
+        description="Organizes the files structure if enabled, otherwise extracts as is",
+        default=True,
+    )
     overwrite: bpy.props.BoolProperty(
         name="Overwrite",
         description="Remove existing add-ons with the same ID",
@@ -333,7 +342,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
 
             addons_old = {mod.__name__ for mod in addon_utils.modules()}
 
-            install_addon(pyfile, path_addons, self.overwrite)
+            install_addon(pyfile, path_addons, self.overwrite, self.smart_extract)
 
             addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
             addons_new.discard("modules")
