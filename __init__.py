@@ -97,16 +97,13 @@ def extract_zip(filename, dst_path, content):
             raise ValueError("No .py files in the Archive")
 
         # if contains only one file and not named '__init__.py'
-        # extract outside
+        # rename it
         if len(scripts) == 1:
             zip_info = scripts[0]
             fname = os.path.basename(zip_info.filename)
 
             if not fname.startswith('__'):   # '__init__.py'
-                content = zip_file.read(zip_info)
-                install_py(fname, dst_path, content)
-                return
-        
+                zip_info.filename = os.path.dirname(zip_info.filename) + "/__init__.py"
 
         # find lowest depth __init__.py
         init_files = [zip_info.filename for zip_info in scripts \
@@ -123,7 +120,7 @@ def extract_zip(filename, dst_path, content):
             # incase of /src/...
             filename = parent_dir.strip("/").replace("/", "-")
         else:
-            # discard zip extension
+            # discard .zip extension
             filename = os.path.splitext(filename)[0]
         
         # remove . from filename
