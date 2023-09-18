@@ -64,6 +64,19 @@ def resolve_url(url):
     return url
 
 
+def module_filesystem_remove(path_base, module_name):
+    module_name = os.path.splitext(module_name)[0]
+    for f in os.listdir(path_base):
+        f_base = os.path.splitext(f)[0]
+        if f_base == module_name:
+            f_full = os.path.join(path_base, f)
+
+            if os.path.isdir(f_full):
+                os.rmdir(f_full)
+            else:
+                os.remove(f_full)
+
+
 def filter_zipfile(zfile, zipname):
     
     # list .py files
@@ -116,11 +129,11 @@ def filter_zipfile(zfile, zipname):
             yield zinfo
 
 
-def install_addon(src_path, dst_path):
+def install_addon(pyfile, path_addons, overwrite=False):
 
-    if src_path.startswith("http://") or src_path.startswith("https://"): # URL
+    if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
 
-        url = resolve_url(src_path)
+        url = resolve_url(pyfile)
         # also filters non .py or .zip files
         filename = get_filename_from_url(url, req_headers=HEADERS)
 
@@ -131,20 +144,23 @@ def install_addon(src_path, dst_path):
         content = r.content
         
     else:   # file path
-        src_path = src_path.replace("\\", os.path.sep).replace("/", os.path.sep)
-        src_path = os.path.abspath(os.path.expanduser(os.path.expandvars(src_path)))
+        pyfile = pyfile.replace("\\", os.path.sep).replace("/", os.path.sep)
+        pyfile = os.path.abspath(os.path.expanduser(os.path.expandvars(pyfile)))
 
+        if os.path.splitext(pyfile)[1] not in ('.py', '.zip'):
+            raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+        
         # Check if we are installing from a target path,
         # doing so causes 2+ addons of same name or when the same from/to
         # location is used, removal of the file!
-        pyfile_dir = os.path.dirname(src_path)
+        pyfile_dir = os.path.dirname(pyfile)
         for addon_path in addon_utils.paths():
             if os.path.samefile(pyfile_dir, addon_path):
                 raise ValueError(("Source file is in the add-on search path: %r") % addon_path)
         # done checking for exceptional case
 
-        filename = os.path.basename(src_path)
-        with open(src_path, 'rb') as fp:
+        filename = os.path.basename(pyfile)
+        with open(pyfile, 'rb') as fp:
             content = fp.read()
     
     ext = os.path.splitext(filename)[1]
@@ -154,15 +170,31 @@ def install_addon(src_path, dst_path):
             bl_info = get_bl_info(str(content, "utf-8"))
             filename = bl_info['name'] + ".py"
 
-        out_path = os.path.join(dst_path, filename)
+        path_dest = os.path.join(path_addons, filename)
 
-        with open(out_path, 'wb') as fp:
+        if overwrite:
+            module_filesystem_remove(path_addons, filename)
+        elif os.path.exists(path_dest):
+            raise ValueError(("File already installed to %r\n") % path_dest)
+        
+        with open(path_dest, 'wb') as fp:
             fp.write(content)
 
     elif ext == ".zip":
         with ZipFile(BytesIO(content)) as zfile:
-            for zinfo in filter_zipfile(zfile, filename):
-                zfile.extract(zinfo, dst_path)
+            file_to_extract = list(filter_zipfile(zfile, filename))
+
+            if overwrite:
+                for zinfo in file_to_extract:
+                    module_filesystem_remove(path_addons, zinfo.filename)
+            else:
+                for zinfo in file_to_extract:
+                    path_dest = os.path.join(path_addons, zinfo.filename)
+                    if os.path.exists(path_dest):
+                        raise ValueError(("File already installed to %r\n") % path_dest)
+            
+            for zinfo in file_to_extract:
+                zfile.extract(zinfo, path_addons)
 
     else:
         raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
@@ -266,13 +298,21 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     )
     target: bpy.props.EnumProperty(
         name="Target Path",
+        description="Choose where to install",
         items=(
             ('DEFAULT', "Default", ""),
             ('PREFS', "User Prefs", ""),
         ),
     )
+    overwrite: bpy.props.BoolProperty(
+        name="Overwrite",
+        description="Remove existing add-ons with the same ID",
+        default=False,
+    )
     enable: bpy.props.BoolProperty(
         name="Enable Addon",
+        description="Enable the Installed Addon",
+        default=False,
     )
 
 
@@ -288,12 +328,12 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     def execute(self, context):
 
         try:
-            src_path = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
-            dst_path = get_addon_path(self.target).replace("\\", "/").rstrip("/")
+            pyfile = self.filepath.strip("\"").strip("\'").replace("\\", "/").rstrip("/")
+            path_addons = get_addon_path(self.target).replace("\\", "/").rstrip("/")
 
             addons_old = {mod.__name__ for mod in addon_utils.modules()}
 
-            install_addon(src_path, dst_path)
+            install_addon(pyfile, path_addons, self.overwrite)
 
             addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
             addons_new.discard("modules")
@@ -324,7 +364,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
             # print message
             msg = (
                 tip_("Modules Installed (%s) from %r into %r") %
-                (", ".join(sorted(addons_new)), src_path, dst_path)
+                (", ".join(sorted(addons_new)), pyfile, path_addons)
             )
             # print(msg)
             self.report({'INFO'}, msg)
