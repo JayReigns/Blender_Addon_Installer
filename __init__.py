@@ -68,18 +68,13 @@ def resolve_url(url):
     return url
 
 
-def install_py(src_path, dst_path, filename, content=None):
-    # src_path not used if content != None
-
-    if not content:
-        with open(src_path, 'rb') as fp:
-            content = fp.read()
+def install_py(filename, dst_path, content):
 
     if filename.startswith('__'):   # '__init__.py'
         bl_info = get_bl_info(text=str(content, "utf-8"))
         filename = bl_info['name'] + ".py"
 
-    out_path = dst_path + "/" + filename
+    out_path = os.path.join(dst_path, filename)
 
     if not os.path.exists(dst_path):
         os.makedirs(dst_path)
@@ -88,10 +83,9 @@ def install_py(src_path, dst_path, filename, content=None):
         fp.write(content)
 
 
-def extract_zip(src_path, dst_path, filename, content=None):
-    """extracts zip and returns main .py file containing bl_info"""
+def extract_zip(filename, dst_path, content):
     
-    file = BytesIO(content) if content else src_path
+    file = BytesIO(content)
     with ZipFile(file) as zip_file:
 
         # list .py files
@@ -110,7 +104,7 @@ def extract_zip(src_path, dst_path, filename, content=None):
 
             if not fname.startswith('__'):   # '__init__.py'
                 content = zip_file.read(zip_info)
-                install_py(src_path, dst_path, fname, content)
+                install_py(fname, dst_path, content)
                 return
         
 
@@ -166,25 +160,23 @@ def install_addon(src_path, dst_path):
         # Check if we are installing from a target path,
         # doing so causes 2+ addons of same name or when the same from/to
         # location is used, removal of the file!
-        addon_path = ""
         pyfile_dir = os.path.dirname(src_path)
         for addon_path in addon_utils.paths():
             if os.path.samefile(pyfile_dir, addon_path):
                 raise ValueError(("Source file is in the add-on search path: %r") % addon_path)
-        del addon_path
-        del pyfile_dir
         # done checking for exceptional case
 
         filename = os.path.basename(src_path)
-        content = None
+        with open(src_path, 'rb') as fp:
+            content = fp.read()
     
-    ext = filename.rsplit(".", 1)[-1].lower()
+    ext = os.path.splitext(filename)[1]
 
-    if ext == "py":
-        install_py(src_path, dst_path, filename, content)
+    if ext == ".py":
+        install_py(filename, dst_path, content)
 
-    elif ext == "zip":
-        extract_zip(src_path, dst_path, filename, content)
+    elif ext == ".zip":
+        extract_zip(filename, dst_path, content)
 
     else:
         raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
