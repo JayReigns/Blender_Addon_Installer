@@ -95,48 +95,50 @@ def extract_zip(src_path, dst_path, filename, content=None):
     with ZipFile(file) as zip_file:
 
         # list .py files
-        scripts = list(info
-                       for info in zip_file.filelist 
-                            if not info.is_dir()
-                                and info.filename.lower().endswith('.py')
-        )
-
+        scripts = [info for info in zip_file.filelist 
+                    if not info.is_dir() and info.filename.lower().endswith('.py')
+        ]
+        
         if not scripts:
             raise ValueError("No .py files in the Archive")
 
-
+        # if contains only one file and not named '__init__.py'
+        # extract outside
         if len(scripts) == 1:
             zip_info = scripts[0]
-            filename = zip_info.filename.rsplit("/", 1)[-1]
+            fname = os.path.basename(zip_info.filename)
 
-            if not filename.startswith('__'):   # '__init__.py'
+            if not fname.startswith('__'):   # '__init__.py'
                 content = zip_file.read(zip_info)
-                return install_py(src_path, dst_path, filename, content)
+                install_py(src_path, dst_path, fname, content)
+                return
         
 
-        # find shortest __init__.py
-        main_file = min(zip_info.filename
-                        for zip_info in scripts
-                    if zip_info.filename.rsplit("/", 1)[-1] == "__init__.py"
+        # find lowest depth __init__.py
+        init_files = (zip_info.filename for zip_info in scripts \
+                    if os.path.basename(zip_info.filename) == "__init__.py"
         )
+        main_file = min(init_files, key=lambda s: s.count("/"))
+        parent_dir = os.path.dirname(main_file)
         
-        parent_file, main_file, _ = main_file.rpartition("__init__.py")
-
-        if parent_file.strip("/") == "":    # __init__.py is in root
-            dst_path += "/" + filename
-        else:   # not necessary but incase of /src/...
-            filename = parent_file.strip("/").replace("/", "-")
-            dst_path += "/" + filename
+        if parent_dir.strip("/") != "": # if __init__.py not in root
+            # incase of /src/...
+            filename = parent_dir.strip("/").replace("/", "-")
+        
+        # remove . from filename
+        # blender doesn't allow . in module name
+        filename = filename.replace(".", "_")
+        dst_path = os.path.join(dst_path, filename)
         
         if not os.path.exists(dst_path):
             os.makedirs(dst_path)
 
-        # only extract __init__.py and its sub files
+        # only extract parent directory of main __init__.py
         for zip_info in zip_file.filelist:  # scripts[] not used
             if zip_info.is_dir():
                 continue
-            if zip_info.filename.startswith(parent_file):
-                zip_info.filename = zip_info.filename[len(parent_file):]
+            if zip_info.filename.startswith(parent_dir):
+                zip_info.filename = zip_info.filename[len(parent_dir):]
                 zip_file.extract(zip_info, dst_path)
 
 
