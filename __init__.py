@@ -109,9 +109,13 @@ def extract_zip(filename, dst_path, content):
         
 
         # find lowest depth __init__.py
-        init_files = (zip_info.filename for zip_info in scripts \
+        init_files = [zip_info.filename for zip_info in scripts \
                     if os.path.basename(zip_info.filename) == "__init__.py"
-        )
+        ]
+
+        if not init_files:
+            raise ValueError("Multiple '.py' files, but no '__init__.py' files in the Archive")
+        
         main_file = min(init_files, key=lambda s: s.count("/"))
         parent_dir = os.path.dirname(main_file)
         
