@@ -124,6 +124,9 @@ def extract_zip(src_path, dst_path, filename, content=None):
         if parent_dir.strip("/") != "": # if __init__.py not in root
             # incase of /src/...
             filename = parent_dir.strip("/").replace("/", "-")
+        else:
+            # discard zip extension
+            filename = os.path.splitext(filename)[0]
         
         # remove . from filename
         # blender doesn't allow . in module name
