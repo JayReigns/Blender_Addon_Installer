@@ -350,20 +350,23 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
 
             # disable any addons we may have enabled previously and removed.
             # this is unlikely but do just in case. bug [#23978]
-            for new_addon in addons_new:
-                addon_utils.disable(new_addon, default_set=True)
+            # for new_addon in addons_new:
+            #     addon_utils.disable(new_addon, default_set=True)
 
-            # possible the zip contains multiple addons, we could disallow this
-            # but for now just use the first
-            for mod in addon_utils.modules(refresh=False):
-                if mod.__name__ in addons_new:
-                    info = addon_utils.module_bl_info(mod)
-
-                    if self.enable:
+            # enable all installed addons
+            if self.enable:
+                for mod in addon_utils.modules(refresh=False):
+                    if mod.__name__ in addons_new:
+                        info = addon_utils.module_bl_info(mod)
                         bpy.ops.preferences.addon_enable(module=mod.__name__)
-                    else:
+            else:
+                # possible the zip contains multiple addons, we could disallow this
+                # but for now just use the first
+                for mod in addon_utils.modules(refresh=False):
+                    if mod.__name__ in addons_new:
+                        info = addon_utils.module_bl_info(mod)
                         open_addon_window(info["name"])
-                    break
+                        break
             
             # in case a new module path was created to install this addon.
             bpy.utils.refresh_script_paths()
