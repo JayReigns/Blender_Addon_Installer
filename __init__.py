@@ -64,76 +64,56 @@ def resolve_url(url):
     return url
 
 
-def install_py(filename, dst_path, content):
-
-    if filename.startswith('__'):   # '__init__.py'
-        bl_info = get_bl_info(str(content, "utf-8"))
-        filename = bl_info['name'] + ".py"
-
-    out_path = os.path.join(dst_path, filename)
-
-    if not os.path.exists(dst_path):
-        os.makedirs(dst_path)
-
-    with open(out_path, 'wb') as fp:
-        fp.write(content)
-
-
-def extract_zip(filename, dst_path, content):
+def filter_zipfile(zfile, zipname):
     
-    file = BytesIO(content)
-    with ZipFile(file) as zip_file:
+    # list .py files
+    scripts = [zinfo for zinfo in zfile.filelist 
+                if not zinfo.is_dir() and zinfo.filename.lower().endswith('.py')
+    ]
+    
+    if not scripts:
+        raise ValueError("No .py files in the Archive")
 
-        # list .py files
-        scripts = [info for info in zip_file.filelist 
-                    if not info.is_dir() and info.filename.lower().endswith('.py')
-        ]
-        
-        if not scripts:
-            raise ValueError("No .py files in the Archive")
+    # if contains only one file and not named '__init__.py'
+    # rename it
+    if len(scripts) == 1:
+        zinfo = scripts[0]
+        dirname, fname = os.path.split(zinfo.filename)
 
-        # if contains only one file and not named '__init__.py'
-        # rename it
-        if len(scripts) == 1:
-            zip_info = scripts[0]
-            fname = os.path.basename(zip_info.filename)
+        if fname != "__init__.py":
+            zinfo.filename = dirname + "/__init__.py"
 
-            if not fname.startswith('__'):   # '__init__.py'
-                zip_info.filename = os.path.dirname(zip_info.filename) + "/__init__.py"
+    # find nearest __init__.py
+    init_files = [zinfo.filename for zinfo in scripts \
+                if os.path.basename(zinfo.filename) == "__init__.py"
+    ]
 
-        # find lowest depth __init__.py
-        init_files = [zip_info.filename for zip_info in scripts \
-                    if os.path.basename(zip_info.filename) == "__init__.py"
-        ]
+    if not init_files:
+        raise ValueError("Multiple '.py' files, but no '__init__.py' files in the Archive")
+    
+    main_file = min(init_files, key=lambda s: s.count("/"))
+    parent_dir = os.path.dirname(main_file)
+    
+    if parent_dir.strip("/"): # if __init__.py not in root
+        # incase of /src/main/...
+        base_dir = parent_dir.strip("/").replace("/", "-")
+    else:
+        # if __init__.py is in root
+        # use 'zipname' without .zip extension
+        base_dir = os.path.splitext(zipname)[0]
+    
+    # remove . from base_dir
+    # blender doesn't allow . in module name
+    base_dir = base_dir.replace(".", "_")
 
-        if not init_files:
-            raise ValueError("Multiple '.py' files, but no '__init__.py' files in the Archive")
-        
-        main_file = min(init_files, key=lambda s: s.count("/"))
-        parent_dir = os.path.dirname(main_file)
-        
-        if parent_dir.strip("/") != "": # if __init__.py not in root
-            # incase of /src/...
-            filename = parent_dir.strip("/").replace("/", "-")
-        else:
-            # discard .zip extension
-            filename = os.path.splitext(filename)[0]
-        
-        # remove . from filename
-        # blender doesn't allow . in module name
-        filename = filename.replace(".", "_")
-        dst_path = os.path.join(dst_path, filename)
-        
-        if not os.path.exists(dst_path):
-            os.makedirs(dst_path)
-
-        # only extract parent directory of main __init__.py
-        for zip_info in zip_file.filelist:  # scripts[] not used
-            if zip_info.is_dir():
-                continue
-            if zip_info.filename.startswith(parent_dir):
-                zip_info.filename = zip_info.filename[len(parent_dir):]
-                zip_file.extract(zip_info, dst_path)
+    # only extract the parent directory of main __init__.py
+    for zinfo in zfile.filelist:
+        if zinfo.is_dir():
+            continue
+        if zinfo.filename.startswith(parent_dir):
+            # weird bug using 'os.path.join' in windows if filename is '/__init__.py'
+            zinfo.filename = os.path.join(base_dir, zinfo.filename[len(parent_dir):].strip("/"))
+            yield zinfo
 
 
 def install_addon(src_path, dst_path):
@@ -170,10 +150,19 @@ def install_addon(src_path, dst_path):
     ext = os.path.splitext(filename)[1]
 
     if ext == ".py":
-        install_py(filename, dst_path, content)
+        if filename.startswith('__'):   # '__init__.py'
+            bl_info = get_bl_info(str(content, "utf-8"))
+            filename = bl_info['name'] + ".py"
+
+        out_path = os.path.join(dst_path, filename)
+
+        with open(out_path, 'wb') as fp:
+            fp.write(content)
 
     elif ext == ".zip":
-        extract_zip(filename, dst_path, content)
+        with ZipFile(BytesIO(content)) as zfile:
+            for zinfo in filter_zipfile(zfile, filename):
+                zfile.extract(zinfo, dst_path)
 
     else:
         raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
