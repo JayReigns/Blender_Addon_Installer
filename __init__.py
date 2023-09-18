@@ -350,6 +350,8 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
                     info = addon_utils.module_bl_info(mod)
 
                     if self.enable:
+                        # BUG: If module is previously installed and overwrites it again
+                        # we can't enable it, as it is already in 'addons_old'
                         bpy.ops.preferences.addon_enable(module=mod.__name__)
                     else:
                         open_addon_window(info["name"])
