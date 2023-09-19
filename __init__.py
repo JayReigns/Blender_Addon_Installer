@@ -141,7 +141,7 @@ def filter_zipfile(zfile, zipname):
 def open_file(pyfile):
     """Returns filename, data(bytes if file is link else file object)"""
 
-    content_types = ("text/plain", "application/zip",)
+    content_types = ("text/plain", "application/zip", "application/octet-stream")
     file_types = (".py", ".zip",)
 
     if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
@@ -285,19 +285,20 @@ def get_filename_from_url(url, req_headers=None, content_types=None, file_types=
 
     resp_headers = r.headers
 
-    content_type = resp_headers["content-type"]
-    if not content_types or any(t in content_type for t in content_types):
+    filename = ""
 
-        if "content-disposition" in resp_headers:
-            disp = resp_headers["content-disposition"]
-            filename = disp.rsplit('filename=', 1)[-1].strip().strip('\"')
-        
-        else:
+    if "content-disposition" in resp_headers:
+        disp = resp_headers["content-disposition"]
+        filename = disp.rsplit('filename=', 1)[-1].strip().strip('\"')
+    
+    else:
+        content_type = resp_headers["content-type"]
+        if not content_types or any(t in content_type for t in content_types):
             filename = os.path.basename(urlparse(url).path)
 
-        # check extension
-        if not file_types or any(filename.endswith(t) for t in file_types):
-            return filename
+    # check extension
+    if not file_types or any(filename.endswith(t) for t in file_types):
+        return filename
 
 
 def download_temp(url, chunk_size=8192):
