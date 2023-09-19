@@ -5,6 +5,10 @@ Quickly install Blender addons from Github link or other links and offline files
 `TopBar > Edit > Install Addon`
 
 ## Features
+- Smart Extraction Allows to install addons from ill-formatted files
+- Automatically pastes copied link
+- Auto enable installed addons
+- Overwrite detection
 - Quotations are allowed in path (eg. `"path"`)
 - Install from local `.py` or `.zip` files
 - Install from links of `.py` or `.zip` files
