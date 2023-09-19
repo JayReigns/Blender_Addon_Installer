@@ -147,6 +147,7 @@ def open_file(pyfile):
     if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
 
         CACHE_FILENAME_FORMAT = "BLAI-{0}-{1}" # BLAI-HASH-filename
+        UNFINISHED_EXT = ".unfinished"
 
         from hashlib import md5
         pyfile_hash = md5(bytes(pyfile, "utf8")).hexdigest()
@@ -155,8 +156,7 @@ def open_file(pyfile):
         # check cache
         cache_path_prefix = CACHE_FILENAME_FORMAT.format(pyfile_hash, "")
         for f in os.listdir(bpy.app.tempdir):
-            print(f)
-            if f.startswith(cache_path_prefix):
+            if f.startswith(cache_path_prefix) and not f.endswith(UNFINISHED_EXT):
                 filename = f[len(cache_path_prefix):]
                 cache_path = os.path.join(bpy.app.tempdir, f)
                 break
@@ -175,10 +175,9 @@ def open_file(pyfile):
             with requests.get(url, allow_redirects=True, headers=HEADERS, stream=True) as r:
                 r.raise_for_status()
 
-                unfinished_ext = ".unfinished"
                 cache_filename = CACHE_FILENAME_FORMAT.format(pyfile_hash, filename)
                 cache_path = os.path.join(bpy.app.tempdir, cache_filename)
-                temp_path = cache_path + unfinished_ext
+                temp_path = cache_path + UNFINISHED_EXT
 
                 # file gets deleted whenever blender closes or crashes
                 data = open(temp_path, 'wb')
