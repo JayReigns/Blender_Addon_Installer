@@ -92,7 +92,7 @@ def filter_zipfile(zfile, zipname):
         if fname != "__init__.py":
             zinfo.filename = dirname + "/__init__.py"
 
-    # find nearest __init__.py
+    # find __init__.py files
     init_files = [zinfo.filename for zinfo in scripts \
                 if os.path.basename(zinfo.filename) == "__init__.py"
     ]
@@ -100,30 +100,41 @@ def filter_zipfile(zfile, zipname):
     if not init_files:
         raise ValueError("Multiple '.py' files, but no '__init__.py' files in the Archive")
     
-    main_file = min(init_files, key=lambda s: s.count("/"))
-    parent_dir = os.path.dirname(main_file)
-    
-    if parent_dir.strip("/"): # if __init__.py not in root
-        # incase of /src/main/...
-        base_dir = parent_dir.strip("/").replace("/", "-")
-    else:
-        # if __init__.py is in root
+    hierarchially_sorted = sorted(init_files,
+            key=lambda file: (os.path.dirname(file), os.path.basename(file))
+    )
+    # remove child files
+    module_files = [hierarchially_sorted[0]]
+    for file in hierarchially_sorted[1:]:
+        if not file.startswith(os.path.dirname(module_files[-1])):
+            module_files.append(file)
+
+    base_dir = ""
+    # get parent of first '__init__.py' in hierarchial order
+    parent_dir = os.path.dirname(hierarchially_sorted[0])
+    if parent_dir.strip("/") == "": # if __init__.py is in root
         # use 'zipname' without .zip extension
         base_dir = os.path.splitext(zipname)[0]
     
-    # remove . from base_dir
-    # blender doesn't allow . in module name
-    base_dir = base_dir.replace(".", "_")
-
     file_to_extract = []
-    # only extract the parent directory of main __init__.py
+    # only extract the parent directory of modules
     for zinfo in zfile.filelist:
-        if zinfo.is_dir():
-            continue
-        if zinfo.filename.startswith(parent_dir):
-            # weird bug using 'os.path.join' in windows if filename is '/__init__.py'
-            zinfo.filename = os.path.join(base_dir, zinfo.filename[len(parent_dir):].strip("/")).replace("\\", "/")
-            file_to_extract.append(zinfo)
+        # if zinfo.is_dir():
+        #     continue
+        for mod in module_files:
+            if zinfo.filename.startswith(os.path.dirname(mod)):
+                parent_dir = os.path.dirname(mod)
+                # merge parent dir names for unique name
+                parent_dir = parent_dir.strip("/").replace("/", "-")
+                # blender doesn't like . in module name
+                parent_dir = parent_dir.replace(".", "_")
+
+                # weird bug using 'os.path.join' in windows if filename starts with '/'
+                # like '/__init__.py', so use lstrip()
+                filepath = zinfo.filename[len(os.path.dirname(mod)):].lstrip("/")
+                zinfo.filename = os.path.join(base_dir, parent_dir, filepath).replace("\\", "/")
+                file_to_extract.append(zinfo)
+                break
     
     return file_to_extract
 
