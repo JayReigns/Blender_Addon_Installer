@@ -138,25 +138,59 @@ def filter_zipfile(zfile, zipname):
     
     return file_to_extract
 
+def open_file(pyfile):
+    """Returns filename, data(bytes if file is link else file object)"""
 
-def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
     content_types = ("text/plain", "application/zip",)
     file_types = (".py", ".zip",)
 
     if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
 
-        url = resolve_url(pyfile)
-        # also filters non .py or .zip files
-        filename = get_filename_from_url(url,
-                            req_headers=HEADERS,
-                            content_types=content_types,
-                            file_types=file_types)
+        CACHE_FILENAME_FORMAT = "BLAI-{0}-{1}" # BLAI-HASH-filename
 
-        if not filename:
-            raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+        from hashlib import md5
+        pyfile_hash = md5(bytes(pyfile, "utf8")).hexdigest()
 
-        r = requests.get(url, allow_redirects=True, headers=HEADERS, stream=True)
-        content = r.content
+        cache_path = None
+        # check cache
+        cache_path_prefix = CACHE_FILENAME_FORMAT.format(pyfile_hash, "")
+        for f in os.listdir(bpy.app.tempdir):
+            print(f)
+            if f.startswith(cache_path_prefix):
+                filename = f[len(cache_path_prefix):]
+                cache_path = os.path.join(bpy.app.tempdir, f)
+                break
+        
+        if not cache_path:
+            url = resolve_url(pyfile)
+            # also filters non .py or .zip files
+            filename = get_filename_from_url(url,
+                                req_headers=HEADERS,
+                                content_types=content_types,
+                                file_types=file_types)
+
+            if not filename:
+                raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
+            
+            with requests.get(url, allow_redirects=True, headers=HEADERS, stream=True) as r:
+                r.raise_for_status()
+
+                unfinished_ext = ".unfinished"
+                cache_filename = CACHE_FILENAME_FORMAT.format(pyfile_hash, filename)
+                cache_path = os.path.join(bpy.app.tempdir, cache_filename)
+                temp_path = cache_path + unfinished_ext
+
+                # file gets deleted whenever blender closes or crashes
+                data = open(temp_path, 'wb')
+
+                for chunk in r.iter_content(chunk_size=8192):
+                    data.write(chunk)
+            
+                data.close()
+                os.rename(temp_path, cache_path)
+        
+        data = open(cache_path, 'rb')
+        
         
     else:   # file path
         pyfile = pyfile.replace("\\", os.path.sep).replace("/", os.path.sep)
@@ -176,8 +210,14 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
         # done checking for exceptional case
 
         filename = os.path.basename(pyfile)
-        with open(pyfile, 'rb') as fp:
-            content = fp.read()
+        data = open(pyfile, 'rb')
+    
+    return filename, data
+
+
+def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
+
+    filename, data = open_file(pyfile)
     
     ext = os.path.splitext(filename)[1]
     addons_new = {}
@@ -185,7 +225,9 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
     if ext == ".py":
         if smart_extract:
             if filename.startswith('__'):   # '__init__.py'
-                bl_info = get_bl_info(str(content, "utf-8"))
+                if not isinstance(data, bytes):
+                    data = data.read()
+                bl_info = get_bl_info(str(data, "utf-8"))
                 filename = bl_info['name'] + ".py"
 
         path_dest = os.path.join(path_addons, filename)
@@ -198,12 +240,15 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
         addons_old = {mod.__name__ for mod in addon_utils.modules()}
         
         with open(path_dest, 'wb') as fp:
-            fp.write(content)
+            if isinstance(data, bytes):
+                fp.write(data)
+            else:
+                shutil.copyfileobj(data, fp)
 
         addons_new = {mod.__name__ for mod in addon_utils.modules()} - addons_old
 
     elif ext == ".zip":
-        with ZipFile(BytesIO(content)) as zfile:
+        with ZipFile(BytesIO(data) if isinstance(data, bytes) else data) as zfile:
             if smart_extract:
                 file_to_extract = filter_zipfile(zfile, filename)
             else:
