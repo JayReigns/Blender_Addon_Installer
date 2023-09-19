@@ -140,12 +140,17 @@ def filter_zipfile(zfile, zipname):
 
 
 def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
+    content_types = ("text/plain", "application/zip",)
+    file_types = (".py", ".zip",)
 
     if pyfile.startswith("http://") or pyfile.startswith("https://"): # URL
 
         url = resolve_url(pyfile)
         # also filters non .py or .zip files
-        filename = get_filename_from_url(url, req_headers=HEADERS)
+        filename = get_filename_from_url(url,
+                            req_headers=HEADERS,
+                            content_types=content_types,
+                            file_types=file_types)
 
         if not filename:
             raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
@@ -157,7 +162,8 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
         pyfile = pyfile.replace("\\", os.path.sep).replace("/", os.path.sep)
         pyfile = os.path.abspath(os.path.expanduser(os.path.expandvars(pyfile)))
 
-        if os.path.splitext(pyfile)[1] not in ('.py', '.zip'):
+        # check extension
+        if not any(pyfile.endswith(t) for t in file_types):
             raise ValueError(UNSUPPORTED_FILE_EXCEPTION_MSG)
         
         # Check if we are installing from a target path,
@@ -228,27 +234,25 @@ def install_addon(pyfile, path_addons, overwrite=False, smart_extract=False):
 #########################################################################################
 
 
-def get_filename_from_url(url, req_headers=None):
+def get_filename_from_url(url, req_headers=None, content_types=None, file_types=None):
 
     r = requests.head(url, allow_redirects=True, headers=req_headers)
     r.raise_for_status()
 
-    headers = r.headers
+    resp_headers = r.headers
 
-    content_type = headers["content-type"]
-    if "text/plain" in content_type or \
-        "application/zip" in content_type:
+    content_type = resp_headers["content-type"]
+    if not content_types or any(t in content_type for t in content_types):
 
-        if "content-disposition" in headers:
-            disp = headers["content-disposition"]
+        if "content-disposition" in resp_headers:
+            disp = resp_headers["content-disposition"]
             filename = disp.rsplit('filename=', 1)[-1].strip().strip('\"')
         
         else:
             filename = os.path.basename(urlparse(url).path)
 
         # check extension
-        ext = os.path.splitext(filename)[1]
-        if ext.lower() in (".py", ".zip",):
+        if not file_types or any(filename.endswith(t) for t in file_types):
             return filename
 
 
