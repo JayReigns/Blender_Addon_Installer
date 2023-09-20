@@ -2,7 +2,7 @@
 bl_info = {
     "name": "Addon Installer",
     "author": "JayReigns",
-    "version": (1, 1, 0),
+    "version": (1, 2, 0),
     "blender": (2, 80, 0),
     "location": "TopBar > Edit > Install Addon",
     "description": "Quickly install Blender addons from Github link",
