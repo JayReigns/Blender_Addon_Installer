@@ -1,5 +1,5 @@
 # Blender Addon Installer
-Quickly install Blender addons from Github link or other links and offline files.
+Quickly install Blender addons from Copied Github links or other links or filepath.
 
 ## Location
 `TopBar > Edit > Install Addon`
