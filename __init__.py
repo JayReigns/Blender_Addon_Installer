@@ -363,7 +363,7 @@ class ADI_OT_Addon_Installer(bpy.types.Operator):
     bl_label = "Install Addon"
 
     filepath: bpy.props.StringProperty(
-        name="URL/FIlepath",
+        name="URL/Filepath",
         # subtype="FILE_PATH",
     )
     target: bpy.props.EnumProperty(
